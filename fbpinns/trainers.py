@@ -21,7 +21,7 @@ from fbpinns.trainers_base import _Trainer
 from fbpinns import networks, plot_trainer
 from fbpinns.util.logger import logger
 from fbpinns.util.jax_util import tree_index, total_size, str_tensor, partition, combine, flops_cost_analysis
-
+from fbpinns.trust_region import trust_region
 
 # LABELLING CONVENTIONS
 
@@ -291,7 +291,9 @@ def FBPINN_update(optimiser_fn, active_opt_states,
     # update step
     lossval, grads = value_and_grad(FBPINN_loss, argnums=0)(
         active_params, fixed_params, static_params, takess, constraints, model_fns, jmapss, loss_fn)
+    
     updates, active_opt_states = optimiser_fn(grads, active_opt_states, active_params)
+    
     active_params = optax.apply_updates(active_params, updates)
     return lossval, active_opt_states, active_params
 
@@ -427,8 +429,10 @@ def _common_train_initialisation(c, key, all_params, problem, domain):
         logger.info(f'\t{k}: {total_size(all_params["trainable"][k]):,}')
 
     # initialise optimiser
-    optimiser = optax.adam(**c.optimiser_kwargs)
+    # optimiser = optax.adam(**c.optimiser_kwargs)
+    optimiser = trust_region(**c.optimiser_kwargs)
     all_opt_states = optimiser.init(all_params["trainable"])
+    
     logger.debug("all_opt_states")
     logger.debug(jax.tree_map(lambda x: str_tensor(x), all_opt_states))
     optimiser_fn, loss_fn = optimiser.update, problem.loss_fn
